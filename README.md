@@ -1,4 +1,5 @@
 # ScaleCube Config
+test2
 
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.scalecube/config/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.scalecube/config)
 
@@ -36,9 +37,9 @@ long timeout = timeoutProperty.get(30 /* default value */);
 ```
 
 Register callbacks on property modifications:
- 
+
 ``` java
-timeoutProperty.addCallback((oldValue, newValue) -> 
+timeoutProperty.addCallback((oldValue, newValue) ->
         System.out.println("Timeout value changed to " + newValue));
 ```
 
@@ -67,21 +68,21 @@ ObjectConfigProperty<MyConfig> config = configRegistry.objectProperty("myapp.con
 MyConfig currentConfig = config.value(MyConfig.defaultValue() /* or default */);
 
 // Register callback (called only once per config reload even when several properties changed)
-config.addCallback((oldConfig, newConfig) -> 
-        System.out.println("MyConfig updated from " + oldConfig + " to " + newConfig)); 
-        
+config.addCallback((oldConfig, newConfig) ->
+        System.out.println("MyConfig updated from " + oldConfig + " to " + newConfig));
+
 // Register validator
-// If meaning is present, an answer should be at least as big as the answer  
-config.addValidator(val -> val.meaning && val.answer >= 42);     
+// If meaning is present, an answer should be at least as big as the answer
+config.addValidator(val -> val.meaning && val.answer >= 42);
 ```
 
 Start embedded HTTP server which exposes configuration endpoints:
-  
+
 ``` java
 ConfigRegistryHttpServer.create(configRegistry, 5050); // starts http server on port 5050
 ```
 
-After HTTP server is started explore configuration registry by browsing following endpoints: 
+After HTTP server is started explore configuration registry by browsing following endpoints:
 * [http://localhost:5050/_config/properties](http://localhost:5050/_config/properties)
 * [http://localhost:5050/_config/sources](http://localhost:5050/_config/sources)
 * [http://localhost:5050/_config/events](http://localhost:5050/_config/events)
@@ -89,14 +90,14 @@ After HTTP server is started explore configuration registry by browsing followin
 
 See more examples at [config-examples](https://github.com/scalecube/config/tree/master/config-examples/src/main/java/io/scalecube/config/examples) module.
 
-## Maven 
+## Maven
 
-Binaries and dependency information for Maven can be found at 
+Binaries and dependency information for Maven can be found at
 [http://search.maven.org](http://search.maven.org/#search%7Cga%7C1%7Cio.scalecube.config).
 
-Change history and [version numbers](http://semver.org/) can be found at [CHANGES.md](https://github.com/scalecube/config/blob/master/CHANGES.md). 
+Change history and [version numbers](http://semver.org/) can be found at [CHANGES.md](https://github.com/scalecube/config/blob/master/CHANGES.md).
 
-Maven dependency: 
+Maven dependency:
 
 ``` xml
 <dependency>
