@@ -64,6 +64,7 @@
         <findbugs.version>2.0.3</findbugs.version>
         <slf4j.version>1.7.7</slf4j.version>
         <jersey.version>2.26-b09</jersey.version>
+        <jasypt.version>1.9.2</jasypt.version>
 
         <maven-compiler-plugin.version>3.7.0</maven-compiler-plugin.version>
         <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
@@ -143,6 +144,11 @@
                 <groupId>org.glassfish.jersey.media</groupId>
                 <artifactId>jersey-media-json-jackson</artifactId>
                 <version>${jersey.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jasypt</groupId>
+                <artifactId>jasypt</artifactId>
+                <version>${jasypt.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

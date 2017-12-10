@@ -2,13 +2,11 @@ package io.scalecube.config;
 
 import io.scalecube.config.audit.ConfigEventListener;
 import io.scalecube.config.source.ConfigSource;
+import io.scalecube.config.utils.EncryptionHandler;
 
 import java.net.InetAddress;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 
 /**
  * @author Anton Kharenko
@@ -28,6 +26,8 @@ public final class ConfigRegistrySettings {
   private final boolean jmxEnabled;
   private final String jmxMBeanName;
 
+  private final List<Function<String, String>> handlers;
+
   private ConfigRegistrySettings(Builder builder) {
     this.reloadIntervalSec = builder.reloadIntervalSec;
     this.recentConfigEventsNum = builder.recentConfigEventsNum;
@@ -40,6 +40,8 @@ public final class ConfigRegistrySettings {
     this.host = builder.host != null ? builder.host : resolveLocalHost();
     this.jmxEnabled = builder.jmxEnabled;
     this.jmxMBeanName = builder.jmxMBeanName;
+    handlers = builder.encryptionPassword != null ?
+        Collections.singletonList(new EncryptionHandler(builder.encryptionPassword)) : Collections.emptyList();
   }
 
   private static String resolveLocalHost() {
@@ -82,6 +84,10 @@ public final class ConfigRegistrySettings {
     return jmxMBeanName;
   }
 
+  public List<Function<String, String>> getHandlers() {
+    return handlers;
+  }
+
   @Override
   public String toString() {
     return "ConfigRegistrySettings{" +
@@ -104,6 +110,7 @@ public final class ConfigRegistrySettings {
     private String host = null;
     private boolean jmxEnabled = DEFAULT_JMX_ENABLED;
     private String jmxMBeanName = DEFAULT_JMX_MBEAN_NAME;
+    private String encryptionPassword = null;
 
     private Builder() {}
 
@@ -148,6 +155,11 @@ public final class ConfigRegistrySettings {
 
     public Builder jmxMBeanName(String jmxMBeanName) {
       this.jmxMBeanName = jmxMBeanName;
+      return this;
+    }
+
+    public Builder encryptionPassword(String encryptionPassword) {
+      this.encryptionPassword = encryptionPassword;
       return this;
     }
 

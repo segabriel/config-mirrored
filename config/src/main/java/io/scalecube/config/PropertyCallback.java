@@ -30,7 +30,7 @@ class PropertyCallback<T> {
    * Value parser function. Converts list of string name-value pairs (input list can be null or empty, in this case
    * function would simply return null) to concrete object, i.e. a config property value.
    */
-  private final Function<List<LoadedConfigProperty>, T> valueParser;
+  private final Function<List<ConfigProperty>, T> valueParser;
 
   /**
    * Set of ConfigProperty objects of the same type assigned to this {@link PropertyCallback}.
@@ -40,7 +40,7 @@ class PropertyCallback<T> {
   /**
    * @param valueParser value parser for config property object of certain type.
    */
-  PropertyCallback(Function<List<LoadedConfigProperty>, T> valueParser) {
+  PropertyCallback(Function<List<ConfigProperty>, T> valueParser) {
     this.valueParser = list -> list == null || list.isEmpty() ? null : valueParser.apply(list);
   }
 
@@ -59,7 +59,7 @@ class PropertyCallback<T> {
    * @see ConfigRegistryImpl#loadAndNotify()
    */
   void computeValue(List<ConfigEvent> events) {
-    List<LoadedConfigProperty> inputList = events.stream()
+    List<ConfigProperty> inputList = events.stream()
         .filter(event -> event.getType() != ConfigEvent.Type.REMOVED) // we only interested in ADDED or UPDATED
         .map(event -> LoadedConfigProperty.withNameAndValue(event.getName(), event.getNewValue())
             .source(event.getNewSource())
@@ -94,7 +94,7 @@ class PropertyCallback<T> {
    * @throws IllegalArgumentException in case value can't be parsed from the inputList or validation doesn't pass.
    * 
    */
-  void computeValue(List<LoadedConfigProperty> inputList, AbstractConfigProperty<T> configProperty) {
+  void computeValue(List<ConfigProperty> inputList, AbstractConfigProperty<T> configProperty) {
     T value = applyValueParser(inputList);
     try {
       configProperty.acceptValue(value, inputList, false/* invokeCallbacks */);
@@ -103,7 +103,7 @@ class PropertyCallback<T> {
     }
   }
 
-  private T applyValueParser(List<LoadedConfigProperty> inputList) {
+  private T applyValueParser(List<ConfigProperty> inputList) {
     try {
       return valueParser.apply(inputList);
     } catch (Exception e) {

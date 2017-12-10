@@ -12,6 +12,10 @@ class StringConfigPropertyImpl extends AbstractSimpleConfigProperty<String> impl
     super(name, String.class, propertyMap, propertyCallbackMap, ConfigRegistryImpl.STRING_PARSER);
   }
 
+  StringConfigPropertyImpl(String name, PropertyHolder propertyHolder) {
+    super(name, String.class, propertyHolder, ConfigRegistryImpl.STRING_PARSER);
+  }
+
   @Override
   public String value(String defaultValue) {
     return super.valueAsString(defaultValue);

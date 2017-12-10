@@ -69,6 +69,8 @@ final class ConfigRegistryImpl implements ConfigRegistry {
 
   private final Map<String, Integer> configSourceStatusMap = new HashMap<>();
 
+  private final PropertyHolder propertyHolder = new PropertyHolderImpl();
+
   private volatile Map<String, LoadedConfigProperty> propertyMap; // being reset on reload
 
   private final Map<String, Map<Class, PropertyCallback>> propertyCallbackMap = new ConcurrentHashMap<>();
@@ -137,7 +139,7 @@ final class ConfigRegistryImpl implements ConfigRegistry {
 
   @Override
   public StringConfigProperty stringProperty(String name) {
-    return new StringConfigPropertyImpl(name, propertyMap, propertyCallbackMap);
+    return new StringConfigPropertyImpl(name, propertyHolder);
   }
 
   @Override
@@ -391,6 +393,67 @@ final class ConfigRegistryImpl implements ConfigRegistry {
       } else {
         LOGGER.debug("Loaded config properties from {}, source: {}", source, name);
       }
+    }
+  }
+
+  private class PropertyHolderImpl implements PropertyHolder {
+
+    @Override
+    public boolean contains(String name) {
+      return propertyMap.containsKey(name);
+    }
+
+    @Override
+    public ConfigProperty getConfigProperty(String name) {
+      ConfigProperty configProperty = propertyMap.get(name);
+      return configProperty != null ? new ConfigPropertyWrapper(configProperty) : null;
+    }
+
+    @Override
+    public PropertyCallback putIfAbsent(String name, Class<?> propertyClass, PropertyCallback propertyCallback) {
+      propertyCallbackMap.putIfAbsent(name, new ConcurrentHashMap<>());
+      Map<Class, PropertyCallback> callbackMap = propertyCallbackMap.get(name);
+      callbackMap.putIfAbsent(propertyClass, propertyCallback);
+      return callbackMap.get(propertyClass);
+    }
+  }
+
+  private class ConfigPropertyWrapper implements ConfigProperty {
+
+    private final ConfigProperty configProperty;
+
+    private ConfigPropertyWrapper(ConfigProperty configProperty) {
+      this.configProperty = configProperty;
+    }
+
+    @Override
+    public String name() {
+      return configProperty.name();
+    }
+
+    @Override
+    public Optional<String> source() {
+      return configProperty.source();
+    }
+
+    @Override
+    public Optional<String> origin() {
+      return configProperty.origin();
+    }
+
+    @Override
+    public Optional<String> valueAsString() {
+      List<Function<String, String>> handlers = settings.getHandlers();
+      Optional<String> result = configProperty.valueAsString();
+      for (Function<String, String> handler : handlers) {
+        result = result.map(handler);
+      }
+      return result;
+    }
+
+    @Override
+    public String valueAsString(String defaultValue) {
+      return valueAsString().orElse(defaultValue);
     }
   }
 }

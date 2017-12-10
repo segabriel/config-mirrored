@@ -1,7 +1,5 @@
 package io.scalecube.config;
 
-import io.scalecube.config.source.LoadedConfigProperty;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +36,7 @@ abstract class AbstractConfigProperty<T> {
 
   private PropertyCallback<T> propertyCallback; // initialized from subclass
   private volatile T value; // initialized from subclass, reset in callback
-  private volatile List<LoadedConfigProperty> inputList; // initialized from subclass, reset in callback
+  private volatile List<ConfigProperty> inputList; // initialized from subclass, reset in callback
 
   AbstractConfigProperty(String name, Class<?> propertyClass) {
     this.name = name;
@@ -83,7 +81,7 @@ abstract class AbstractConfigProperty<T> {
    * 
    * @see PropertyCallback#computeValue(List, AbstractConfigProperty)
    */
-  final void computeValue(List<LoadedConfigProperty> inputList) {
+  final void computeValue(List<ConfigProperty> inputList) {
     propertyCallback.computeValue(inputList, this);
   }
 
@@ -96,7 +94,7 @@ abstract class AbstractConfigProperty<T> {
    * @param invokeCallbacks flag indicating whether it's needed to notify callbacks about changes.
    * @throws IllegalArgumentException in case new value fails against existing validators.
    */
-  final void acceptValue(T value1, List<LoadedConfigProperty> inputList1, boolean invokeCallbacks) {
+  final void acceptValue(T value1, List<ConfigProperty> inputList1, boolean invokeCallbacks) {
     if ((value == null && value1 == null) || isInputsEqual(inputList, inputList1)) {
       return;
     }
@@ -121,7 +119,7 @@ abstract class AbstractConfigProperty<T> {
    * Helper method which applies given {@code mapper} lambda to the {@link #inputList} (if any). For example if one
    * needs to retrieve more than just a {@link #value} info from this config property, like source, origin and etc.
    */
-  final Optional<String> mapToString(Function<List<LoadedConfigProperty>, String> mapper) {
+  final Optional<String> mapToString(Function<List<ConfigProperty>, String> mapper) {
     return Optional.ofNullable(inputList).map(mapper);
   }
 
@@ -135,16 +133,16 @@ abstract class AbstractConfigProperty<T> {
     }
   }
 
-  private boolean isInputsEqual(List<LoadedConfigProperty> inputList, List<LoadedConfigProperty> inputList1) {
-    if ((inputList == null && inputList1 != null) || (inputList != null && inputList == null)) {
+  private boolean isInputsEqual(List<ConfigProperty> inputList, List<ConfigProperty> inputList1) {
+    if ((inputList == null && inputList1 != null) || (inputList != null && inputList1 == null)) {
       return false;
     }
 
     Map<String, Optional<String>> inputMap = inputList.stream().collect(Collectors.toMap(
-        LoadedConfigProperty::name, LoadedConfigProperty::valueAsString));
+        ConfigProperty::name, ConfigProperty::valueAsString));
 
     Map<String, Optional<String>> inputMap1 = inputList1.stream().collect(Collectors.toMap(
-        LoadedConfigProperty::name, LoadedConfigProperty::valueAsString));
+        ConfigProperty::name, ConfigProperty::valueAsString));
 
     return inputMap.equals(inputMap1);
   }

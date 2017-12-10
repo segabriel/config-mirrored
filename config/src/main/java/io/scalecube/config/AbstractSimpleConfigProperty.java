@@ -30,7 +30,24 @@ class AbstractSimpleConfigProperty<T> extends AbstractConfigProperty<T> implemen
     // noinspection unchecked
     setPropertyCallback(computePropertyCallback(valueParser, propertyCallbackMap));
 
-    LoadedConfigProperty configProperty = propertyMap.get(name);
+    ConfigProperty configProperty = propertyMap.get(name);
+    computeValue(configProperty != null ? Collections.singletonList(configProperty) : null);
+  }
+
+  /**
+   * Constructor for non-object config property.
+   */
+  AbstractSimpleConfigProperty(String name,
+                               Class<?> propertyClass,
+                               PropertyHolder propertyHolder,
+                               Function<String, T> valueParser) {
+
+    super(name, propertyClass);
+
+    // noinspection unchecked
+    setPropertyCallback(computePropertyCallback(valueParser, propertyHolder));
+
+    ConfigProperty configProperty = propertyHolder.getConfigProperty(name);
     computeValue(configProperty != null ? Collections.singletonList(configProperty) : null);
   }
 
@@ -68,5 +85,12 @@ class AbstractSimpleConfigProperty<T> extends AbstractConfigProperty<T> implemen
     Map<Class, PropertyCallback> callbackMap = propertyCallbackMap.get(name);
     callbackMap.putIfAbsent(propertyClass, propertyCallback);
     return callbackMap.get(propertyClass);
+  }
+
+  private PropertyCallback computePropertyCallback(Function<String, T> valueParser,
+                                                   PropertyHolder propertyHolder) {
+    PropertyCallback<T> propertyCallback =
+        new PropertyCallback<>(list -> list.get(0).valueAsString().map(valueParser).orElse(null));
+    return propertyHolder.putIfAbsent(name, propertyClass, propertyCallback);
   }
 }

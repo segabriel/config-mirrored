@@ -1,6 +1,5 @@
 package io.scalecube.config;
 
-import io.scalecube.config.source.LoadedConfigProperty;
 import io.scalecube.config.utils.ThrowableUtil;
 
 import java.util.List;
@@ -10,7 +9,7 @@ import java.util.stream.Collectors;
 
 /**
  * Parser for {@link ObjectConfigProperty}. Returns object instance of the given class by the list of
- * {@link LoadedConfigProperty}-s and list of {@link ObjectPropertyField}-s. The class must contain default constructor.
+ * {@link ConfigProperty}-s and list of {@link ObjectPropertyField}-s. The class must contain default constructor.
  */
 class ObjectPropertyParser {
 
@@ -18,7 +17,7 @@ class ObjectPropertyParser {
     // Do not instantiate
   }
 
-  static <T> T parseObject(List<LoadedConfigProperty> inputList,
+  static <T> T parseObject(List<ConfigProperty> inputList,
       List<ObjectPropertyField> propertyFields,
       Class<T> cfgClass) {
 
@@ -30,7 +29,7 @@ class ObjectPropertyParser {
     }
 
     Map<String, Optional<String>> inputMap = inputList.stream()
-        .collect(Collectors.toMap(LoadedConfigProperty::name, LoadedConfigProperty::valueAsString));
+        .collect(Collectors.toMap(ConfigProperty::name, ConfigProperty::valueAsString));
 
     for (ObjectPropertyField propertyField : propertyFields) {
       Optional<String> valueOptional = inputMap.get(propertyField.getPropertyName());
