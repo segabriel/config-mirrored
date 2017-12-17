@@ -5,6 +5,7 @@ import io.scalecube.config.keyvalue.KeyValueConfigName;
 import io.scalecube.config.keyvalue.KeyValueConfigRepository;
 import io.scalecube.config.utils.ThrowableUtil;
 import org.apache.curator.framework.CuratorFramework;
+import org.apache.zookeeper.KeeperException;
 
 import javax.annotation.Nonnull;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +34,12 @@ public class ZookeeperConfigRepository implements KeyValueConfigRepository {
 
   public void put(String path, String value) throws Exception {
     byte[] data = value.getBytes(StandardCharsets.UTF_8);
-    connector.getClient().create().creatingParentsIfNeeded().forPath(path, data);
+    try {
+      connector.getClient().create().creatingParentsIfNeeded().forPath(path, data);
+    } catch (KeeperException.NodeExistsException e) {
+      // key already exists - update the data instead
+      connector.getClient().setData().forPath(path, data);
+    }
   }
 
   public void put(Map<String, String> props) throws Exception {
@@ -44,7 +50,7 @@ public class ZookeeperConfigRepository implements KeyValueConfigRepository {
           try {
             String path = entry.getKey();
             byte[] data = entry.getValue().getBytes(StandardCharsets.UTF_8);
-            client.create().creatingParentsIfNeeded().forPath(path);
+//            client.create().creatingParentsIfNeeded().forPath(path);
             return client.transactionOp().setData().forPath(path, data);
           } catch (Exception e) {
             throw ThrowableUtil.propagate(e);
