@@ -3,62 +3,55 @@ package io.scalecube.config.zookeeper.cache;
 import io.scalecube.config.keyvalue.KeyValueConfigEntity;
 import io.scalecube.config.keyvalue.KeyValueConfigName;
 import io.scalecube.config.keyvalue.KeyValueConfigRepository;
-import io.scalecube.config.utils.ThrowableUtil;
 import io.scalecube.config.zookeeper.ZookeeperConfigConnector;
+import io.scalecube.config.zookeeper.ZookeeperSimpleConfigRepository;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.BackgroundCallback;
 import org.apache.curator.framework.api.CuratorEvent;
 import org.apache.curator.shaded.com.google.common.base.Preconditions;
-import org.apache.curator.utils.ThreadUtils;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRepository {
+public class ZookeeperCallbackCacheConfigRepository implements KeyValueConfigRepository {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperCacheKeyVakueConfigRepository.class);
-
-  private static final ScheduledExecutorService reloadExecutor = reloadExecutor();
-
-
-  private static ScheduledExecutorService reloadExecutor() {
-    ThreadFactory threadFactory = r -> {
-      Thread thread = new Thread(r);
-      thread.setDaemon(true);
-      thread.setName("zookeeper-cache-reloader");
-      thread.setUncaughtExceptionHandler((t, e) -> LOGGER.error("Exception occurred: " + e, e));
-      return thread;
-    };
-    return Executors.newSingleThreadScheduledExecutor(threadFactory);
-  }
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZookeeperCallbackCacheConfigRepository.class);
 
   private final CuratorFramework client;
-  private final Duration delay;
 
   private Map<KeyValueConfigName, TreeNode> roots = new ConcurrentHashMap<>();
-  private Map<String, KeyValueConfigEntity> props = new ConcurrentHashMap<>();
+  private Map<KeyValueConfigName, Map<String, KeyValueConfigEntity>> props = new ConcurrentHashMap<>();
 
-  public ZookeeperCacheKeyVakueConfigRepository(@Nonnull ZookeeperConfigConnector connector, @Nonnull Duration delay) {
+  public ZookeeperCallbackCacheConfigRepository(@Nonnull ZookeeperConfigConnector connector) {
     this.client = Objects.requireNonNull(connector).getClient();
-    this.delay = delay;
   }
 
   @Override
-  public List<KeyValueConfigEntity> findAll(@Nonnull KeyValueConfigName configName) throws Exception {
+  public List<KeyValueConfigEntity> findAll(@Nonnull KeyValueConfigName configName) {
     roots.computeIfAbsent(configName, TreeNode::new);
-    System.out.println(props);
-    return new ArrayList<>(props.values());
+    ArrayList<KeyValueConfigEntity> result = new ArrayList<>(props.computeIfAbsent(configName, k -> new ConcurrentHashMap<>()).values());
+    System.out.println("findAll = " + result);
+    return result;
   }
 
+  private void warmup(KeyValueConfigName configName) {
+    try {
+      new ZookeeperSimpleConfigRepository(client).findAll(configName)
+          .forEach(entity -> props.computeIfAbsent(configName, k -> new ConcurrentHashMap<>()).put(entity.getPropName(), entity));
+    } catch (Exception e) {
+      LOGGER.error("Exception occurred: " + e, e);
+    }
+  }
 
   private final class TreeNode implements Watcher, BackgroundCallback {
 
@@ -73,6 +66,7 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
       this.path = resolvePath(configName);
       this.propertyName = "";
       this.parent = null;
+      warmup(configName);
       refresh();
     }
 
@@ -106,21 +100,17 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
             break;
         }
       } catch (Exception e) {
-        throw ThrowableUtil.propagate(e);
-//      handleException(e);
+        LOGGER.error("Exception occurred: " + e, e);
       }
     }
 
     @Override
     public void processResult(CuratorFramework client, CuratorEvent event) throws Exception {
-//      Stat newStat = event.getStat();
-      if (event.getData() != null) {
-        System.err.println("processResult: " + event + "      8*****> data => " + new String(event.getData()));
-      } else {
-        System.err.println("processResult: " + event);
-      }
-
-
+//      if (event.getData() != null) {
+//        System.err.println("******************** processResult: " + event + "      8*****> data => " + new String(event.getData()));
+//      } else {
+//        System.err.println("******************** processResult: " + event);
+//      }
       switch (event.getType()) {
         case EXISTS:
           Preconditions.checkState(parent == null, "unexpected EXISTS on non-root node");
@@ -132,7 +122,6 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
           if (event.getResultCode() == KeeperException.Code.OK.intValue()) {
             event.getChildren().stream()
                 .filter(child -> !children.containsKey(child))
-                .sorted() //todo Present new children in sorted order for test determinism. WTF?
                 .forEach(child -> {
                   String fullPath = ZKPaths.makePath(path, child);
                   TreeNode node = newChildNode(fullPath);
@@ -147,25 +136,20 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
         case GET_DATA:
           if (event.getResultCode() == KeeperException.Code.OK.intValue()) {
             if (event.getData() != null && event.getData().length > 0) {
-              KeyValueConfigEntity entity = entity(event);
-              props.put(entity.getPropName(), entity);
+              KeyValueConfigEntity entity = entity(event.getData());
+              props.computeIfAbsent(configName, k -> new ConcurrentHashMap<>()).put(entity.getPropName(), entity);
             }
           } else if (event.getResultCode() == KeeperException.Code.NONODE.intValue()) {
             wasDeleted();
           }
           break;
         default:
-          // An unknown event, probably an error of some sort like connection loss.
-//        LOG.info(String.format("Unknown event %s", event));
-          return;
+          LOGGER.warn("Unknown event: " + event);
       }
     }
 
     private String resolvePath(KeyValueConfigName configName) {
-      StringBuilder sb = new StringBuilder("/");
-      configName.getGroupName().ifPresent(groupName -> sb.append(groupName).append("/"));
-      sb.append(configName.getCollectionName());
-      return sb.toString();
+      return configName.getGroupName().map(group -> "/" + group + "/").orElse("/") + configName.getCollectionName();
     }
 
     private void refresh() {
@@ -177,18 +161,15 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
       try {
         client.getChildren().usingWatcher(this).inBackground(this).forPath(path);
       } catch (Exception e) {
-        throw ThrowableUtil.propagate(e);
+        LOGGER.error("Exception occurred: " + e, e);
       }
     }
 
     private void refreshData() {
       try {
-        byte[] bytes = client.getData().usingWatcher(this)/*.inBackground(this)*/.forPath(path);
-        if (bytes != null) {
-          System.err.println("!!! =>>>>>>>>>>>>>>>>>>> " + new String(bytes));
-        }
+        client.getData().usingWatcher(this).inBackground(this).forPath(path);
       } catch (Exception e) {
-        throw ThrowableUtil.propagate(e);
+        LOGGER.error("Exception occurred: " + e, e);
       }
     }
 
@@ -212,15 +193,8 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
           parent.children.remove(ZKPaths.getNodeFromPath(path), this);
         }
       } catch (Exception e) {
-        throw ThrowableUtil.propagate(e);
+        LOGGER.error("Exception occurred: " + e, e);
       }
-    }
-
-    private KeyValueConfigEntity entity(CuratorEvent event) {
-      KeyValueConfigEntity entity = new KeyValueConfigEntity().setConfigName(configName);
-      entity.setPropName(propertyName);
-      entity.setPropValue(new String(event.getData()));
-      return entity;
     }
 
     private KeyValueConfigEntity entity(byte[] data) {
@@ -232,8 +206,7 @@ public class ZookeeperCacheKeyVakueConfigRepository implements KeyValueConfigRep
 
     private String propertyName(String fullPath) {
       String rootPath = resolvePath(configName);
-      return fullPath.substring(rootPath.length() + 1).replace("/", ".");
+      return fullPath.substring(rootPath.length() + "/".length()).replace("/", ".");
     }
   }
-
 }

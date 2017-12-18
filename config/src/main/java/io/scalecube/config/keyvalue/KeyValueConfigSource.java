@@ -119,7 +119,6 @@ public class KeyValueConfigSource implements ConfigSource {
       List<KeyValueConfigEntity> result;
       try {
         result = repository.findAll(configName);
-//        System.err.println(result);
       } catch (Exception e) {
         LOGGER.warn("Exception at {}.findAll({}), cause: {}", repository.getClass().getSimpleName(), configName, e);
         result = Collections.emptyList();
